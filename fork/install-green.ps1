@@ -28,6 +28,26 @@ function Fail([string]$Message) {
 $desktop = Join-Path $Repo 'apps\desktop'
 if (-not (Test-Path $desktop)) { Fail "missing $desktop" }
 
+# A fresh clone has no apps/desktop/.env.windows because it is git-ignored. Unsigned builds only
+# need the installer identity, so create the minimum instead of failing at the packaging step.
+$envFile = Join-Path $desktop '.env.windows'
+if (-not (Test-Path $envFile)) {
+  $template = Join-Path $PSScriptRoot 'windows.env.template'
+  $appIdLine = $null
+  if (Test-Path $template) {
+    $appIdLine = Get-Content $template |
+      Where-Object { $_ -match '^\s*DSH_DESKTOP_APP_ID=' } |
+      Select-Object -First 1
+  }
+  if (-not $appIdLine) { $appIdLine = 'DSH_DESKTOP_APP_ID=com.rainroom.harness' }
+  Write-Host "install-green: creating $envFile ($($appIdLine.Trim()))"
+  Set-Content -Path $envFile -Encoding ASCII -Value @(
+    '# Rain Harness fork Windows packaging settings (local, git-ignored).',
+    '# Written by fork/install-green.ps1; source template: fork/windows.env.template',
+    $appIdLine.Trim()
+  )
+}
+
 if (-not $SkipBuild) {
   Write-Host 'install-green: building (roughly 20 minutes)...'
   Push-Location $desktop

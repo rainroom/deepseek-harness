@@ -85,12 +85,12 @@
 
 ## 打包
 
-只需要一次前置准备：`apps/desktop/.env.windows`（被 git 忽略）必须存在。改动 #6/#7 之后，
-unsigned 构建只需其中的安装器身份：
+`apps/desktop/.env.windows` 被 git 忽略；改动 #6/#7 之后，unsigned 构建只需要其中的安装器身份。
+`fork/install-green.ps1` 会在它缺失时按 `fork/windows.env.template` 自动生成，通常不必手动准备。
+需要手动创建时：
 
 ```powershell
 Copy-Item fork\windows.env.template apps\desktop\.env.windows
-# 或直接写一行：DSH_DESKTOP_APP_ID=com.rainroom.harness
 ```
 
 ### 免安装绿色版（日常使用）
@@ -163,6 +163,14 @@ foreach ($d in $pngs) { $bw.Write($d) }
 $bw.Flush(); $bw.Dispose(); $fs.Dispose()
 ```
 
+## 升级前准备（只需一次）
+
+- Node ≥ 24.9 与仓库自带的 pnpm；首次克隆后先执行 `pnpm install`（约 5 分钟）。
+- 磁盘占用：构建目录约 3 GB，部署目录约 1.1 GB。
+- `apps/desktop/.env.windows` 由部署脚本自动生成，不必手动准备。
+- **构建期间不要改动 git**（提交、切分支、改工作树）。构建会把 commit/脏标记写进客户端产物
+  记录，中途变化会让打包在最后阶段判定"构建环境与产物不一致"而失败。
+
 ## 每次更新的流程
 
 ```powershell
@@ -171,12 +179,35 @@ git fetch upstream master
 git merge upstream/master          # 冲突基本只出现在上表文件
 pnpm install                       # 依赖有变化时
 
-# 构建 + 部署 + 修好快捷方式（会先关闭正在运行的旧实例）
+# 构建 + 部署 + 修好快捷方式（会先关闭正在运行的旧实例；约 16-20 分钟）
 powershell -NoProfile -ExecutionPolicy Bypass -File fork\install-green.ps1
 ```
 
 升级全程不碰这两个目录，会话、凭据与已装插件原样保留：`~/.raindsh`、
 `%APPDATA%\@rainroom\dsh-desktop`。它们在程序目录之外，正常升级不会动到；**不要手动删除**。
+
+只想把现有构建重新部署一次（不重新构建）：
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File fork\install-green.ps1 -SkipBuild
+```
+
+## 升级后验证
+
+1. 双击桌面 `Rain Harness`，帮助菜单的"关于"里版本号是新的。
+2. `~/.raindsh` 的时间戳有更新，官方 `~/.dsh` 没有任何变化。
+3. 旧会话仍在列表里，已装插件仍在 `~/.raindsh/profiles/desktop`。
+4. 快捷方式目标仍是 `D:\E\AI_DEV_PROJECT\dsh-use-app\Rain Harness.exe`。
+
+## 故障处理
+
+| 现象 | 处理 |
+|---|---|
+| 打包末尾报 `client build environment differs` | 构建期间动过 git。保持工作树干净后重跑。 |
+| 报 `desktop package: cannot read ... .env.windows` | 删掉损坏的文件，重跑脚本会自动重建。 |
+| 桌面快捷方式打不开 | 部署目录被移动或删除。重跑 `install-green.ps1 -SkipBuild`。 |
+| 想先确认配置再花时间构建 | `cd apps\desktop` 后执行 `pnpm exec tsx scripts/package-target.ts win-x64 --unsigned --check`。 |
+| 想回滚到上一版 | 升级前把 `dsh-use-app` 复制一份；回滚时关闭应用、把副本还原回该路径。 |
 
 ## 同步上游后必须复查
 
