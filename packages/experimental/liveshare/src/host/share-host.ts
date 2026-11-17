@@ -674,7 +674,8 @@ function takeOwnerStateClaim(dir: string): OwnerHostClaim | undefined {
 }
 
 function defaultOwnerStateFile(): string {
-  const dshHome = nonEmpty(process.env.DSH_HOME) ?? join(homedir(), '.dsh')
+  // Mirrors DSH_HOME_DIR_NAME from @deepseek-ai/dsh-home-paths, and follows $DSH_HOME the same way.
+  const dshHome = nonEmpty(process.env.DSH_HOME) ?? join(homedir(), '.raindsh')
   return join(dshHome, 'liveshare', 'owner-shares.json')
 }
 
