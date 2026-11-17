@@ -2,7 +2,7 @@
 Deploy the Rain Harness green build to a stable folder and keep one desktop shortcut valid.
 
 The app files are mirrored into -InstallDir on every run. Everything the app owns at runtime
-lives outside the app folder (~/.raindsh and %APPDATA%\@rainroom\dsh-desktop), so replacing the
+lives outside the app folder (~/.dsh and %APPDATA%\@rainroom\dsh-desktop), so replacing the
 program files never touches sessions, credentials, workspaces or installed plugins.
 
 Usage:
@@ -93,7 +93,7 @@ if (-not $NoShortcut) {
   Write-Host "install-green: shortcut $link"
 }
 
-$harnessHome = Join-Path $env:USERPROFILE '.raindsh'
+$harnessHome = Join-Path $env:USERPROFILE '.dsh'
 $userData = Join-Path $env:APPDATA '@rainroom\dsh-desktop'
 Write-Host "install-green: deployed $((Get-Item $exe).LastWriteTime) to $exe"
 Write-Host "install-green: runtime data stays in $harnessHome and $userData"
