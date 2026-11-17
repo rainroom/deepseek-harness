@@ -64,6 +64,9 @@
 - 插件各自安装：官方版的插件在 `profiles/desktop`，本 fork 的在 `profiles/rain-desktop`，互不影响，
   但磁盘占用是两份。
 - 升级本 fork 只替换程序目录，`~/.dsh` 与 `%APPDATA%\@rainroom\dsh-desktop` 都不会被删除。
+- **切换 profile 后旧配置不会自动迁移。** 模型、供应商、界面开关都写在
+  `~/.dsh/profiles/<profile>/cordis.patch.yml` 里；换 profile 名后需要把旧的那个文件复制到新
+  profile 目录，否则会看起来像"配置丢了"。插件目录 `node_modules` 同理，需要重新安装。
 
 ## 打包
 
