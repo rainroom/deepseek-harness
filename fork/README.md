@@ -29,6 +29,7 @@
 | 9 | `apps/desktop/tests/welcome-startup.spec.ts` | 两处 `dsh://open` 断言改为 `raindsh://open` | 跟随改动 #8。 |
 | 10 | `packages/util/home-paths/tests/home-paths.spec.ts` | 默认目录断言改为 `.raindsh` / `~/.raindsh` | 跟随改动 #1。`expandHomePath` 用例仍用任意字面量，与默认值无关，保持不变。 |
 | 11 | `apps/desktop/scripts/electron-builder-config.mjs` + `resources/icon-windows.ico` | `win.icon` 改用预生成的多尺寸 ICO，并提交该文件 | electron-builder 的 PNG→ICO 转换会调起 WASM 图标工具，需要 WASM SIMD；不支持 SIMD 的机器（含部分虚拟机）会在打包最后一步失败。用已生成的 ICO 绕开这一步。 |
+| 12 | `apps/desktop/scripts/smoke-packaged-runtime.ts` | 用 `PRODUCT_NAME` 常量替代硬编码的 `DeepSeek Harness.exe` / `.app` | 打包后的冒烟测试按固定文件名启动应用；产品名改了之后它找不到 exe，会让整次打包以失败收场。 |
 
 ### 刻意未改动
 
@@ -177,6 +178,8 @@ pnpm exec tsx scripts/package-target.ts win-x64 --unsigned --dir
 2. `electron-builder-config.mjs` 的 `extraMetadata.name`、`productName`、`protocols`
    与 `main.ts` 的协议字符串仍然一致。
 3. unsigned 的两处策略例外（改动 #6/#7）仍在，否则打包会重新要求 HTTPS 策略来源。
+4. 产品名 `Rain Harness` 出现在两处并需同步：`electron-builder-config.mjs` 的 `productName`
+   与 `smoke-packaged-runtime.ts` 的 `PRODUCT_NAME`（打包后的冒烟测试用它定位可执行文件）。
 
 ## 已知限制
 
