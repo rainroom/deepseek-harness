@@ -12,14 +12,15 @@ export interface DesktopPaths {
 /**
  * Resolve every Electron-owned path without changing the shared data roots.
  *
- * Fork: the profile is named `rain-desktop`, so this build never contends with the upstream
- * Desktop's `profiles/desktop` lock while both still share the default `~/.dsh` data root.
+ * Fork: this build keeps the upstream `profiles/desktop` profile so the full default plugin
+ * environment applies. Coexistence with the upstream Desktop relies on the separate Electron
+ * userData identity (`extraMetadata.name`), not on the profile directory.
  * @param dshHome - Harness home shared with npm-installed dsh.
  * @returns immutable desktop path set.
  */
 export function resolveDesktopPaths(dshHome: string = resolveDshHome()): DesktopPaths {
   return {
-    profile: join(dshHome, 'profiles', 'rain-desktop'),
-    lock: join(dshHome, 'profiles', 'rain-desktop', 'lock'),
+    profile: join(dshHome, 'profiles', 'desktop'),
+    lock: join(dshHome, 'profiles', 'desktop', 'lock'),
   }
 }
