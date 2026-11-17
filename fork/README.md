@@ -5,24 +5,29 @@
 
 ## 目的
 
-产出一个可以长期使用、独立安装的客户端：数据目录、Electron 用户数据、单实例锁、
-安装身份、URL 协议都与官方 DeepSeek Harness 不同。因此两个客户端可以同时安装、
-同时运行、互不覆盖数据。
+产出一个可以长期使用、独立安装的客户端：
+
+- 数据根是 `~/.raindsh`，与官方版的 `~/.dsh` 完全分开。
+- Electron 用户数据、单实例锁、安装身份、URL 协议都与官方版不同，因此两者可以同时安装、
+  同时运行、互不覆盖。
+- 不使用自动更新：每次升级由本仓库重新打包完成。
 
 ## 改动清单
 
-改动刻意保持最小，只触碰决定身份和路径的位置，避免每次同步上游都大面积冲突。
+改动刻意保持最小，只触碰决定身份、路径和更新策略的位置，避免每次同步上游都大面积冲突。
 
 | # | 文件 | 改动 | 原因 |
 |---|---|---|---|
-| 1 | `packages/util/home-paths/src/index.ts` | `DSH_HOME_DIR_NAME` 由 `'.dsh'` 改为 `'.raindsh'` | 这是所有 Harness 数据（sessions、profiles、credentials、storages、workspaces）的唯一默认根。改这一行即整体迁移到 `~/.raindsh`。`$DSH_HOME` 环境变量仍然优先，显式配置仍然最高优先。 |
+| 1 | `packages/util/home-paths/src/index.ts` | `DSH_HOME_DIR_NAME` 由 `'.dsh'` 改为 `'.raindsh'` | 这是所有 Harness 数据（sessions、profiles、credentials、storages、workspaces）的唯一默认根。改这一行即整体迁移到 `~/.raindsh`。`$DSH_HOME` 仍然优先，显式配置仍然最高优先。 |
 | 2 | `packages/experimental/liveshare/src/host/share-host.ts` | `defaultOwnerStateFile()` 的兜底目录由 `'.dsh'` 改为 `'.raindsh'` | 该文件自己硬编码了 home 兜底，不跟随改动 #1。注释已标明它镜像 `DSH_HOME_DIR_NAME`。 |
-| 3 | `apps/desktop/scripts/electron-builder-config.mjs` | `extraMetadata.name` 设为 `'@rainroom/dsh-desktop'` | Electron 从打包后的 manifest 取 `app.name`，据此决定 userData 目录、单实例锁名。上一行是让两个客户端不共用 `%APPDATA%\@deepseek-ai\dsh-desktop` 的关键。 |
-| 4 | 同上 | `productName` 改为 `'Rain Harness'` | electron-builder 用它决定安装目录（Windows 为 `%LOCALAPPDATA%\Programs\<productName>`）和卸载项显示名。同名会被当作升级覆盖。 |
+| 3 | `apps/desktop/scripts/electron-builder-config.mjs` | `extraMetadata.name` 设为 `'@rainroom/dsh-desktop'` | Electron 从打包后的 manifest 取 `app.name`，据此决定 userData 目录与单实例锁名。这一行让两个客户端不再共用 `%APPDATA%\@deepseek-ai\dsh-desktop`。 |
+| 4 | 同上 | `productName` 改为 `'Rain Harness'` | electron-builder 用它决定安装目录（`%LOCALAPPDATA%\Programs\<productName>`）、可执行文件名、卸载项显示名。同名会被当作升级覆盖。 |
 | 5 | 同上 | `protocols` 改为 `{ name: 'Rain Harness', schemes: ['raindsh'] }` | 两个客户端不再抢同一个 `dsh://` 协议处理器。 |
-| 6 | `apps/desktop/src/main.ts` | `setAsDefaultProtocolClient('raindsh')`、`raindsh://open` | 跟随改动 #5，注册与解析保持一致。 |
-| 7 | `apps/desktop/tests/welcome-startup.spec.ts` | 两处 `dsh://open` 断言改为 `raindsh://open` | 跟随改动 #6。 |
-| 8 | `packages/util/home-paths/tests/home-paths.spec.ts` | 默认目录断言改为 `.raindsh` / `~/.raindsh` | 跟随改动 #1。`expandHomePath` 用例仍用任意字面量，与默认值无关，保持不变。 |
+| 6 | 同上 | unsigned 构建不再解析强制更新策略 | 上游把"无策略"只给了 macOS unsigned，Windows 仍需一个 HTTPS 策略来源。本 fork 从不参与自动更新，这个要求只会挡住本地打包。 |
+| 7 | `apps/desktop/scripts/desktop-package-environment.mjs` | `validateDesktopPackageEnvironment` 同样只在非 unsigned 时解析策略 | 跟随改动 #6，否则校验阶段仍会要求填写策略来源。 |
+| 8 | `apps/desktop/src/main.ts` | `setAsDefaultProtocolClient('raindsh')`、`raindsh://open` | 跟随改动 #5，注册与解析保持一致。 |
+| 9 | `apps/desktop/tests/welcome-startup.spec.ts` | 两处 `dsh://open` 断言改为 `raindsh://open` | 跟随改动 #8。 |
+| 10 | `packages/util/home-paths/tests/home-paths.spec.ts` | 默认目录断言改为 `.raindsh` / `~/.raindsh` | 跟随改动 #1。`expandHomePath` 用例仍用任意字面量，与默认值无关，保持不变。 |
 
 ### 刻意未改动
 
@@ -32,7 +37,7 @@
   冲突面会明显变大，而不影响产品行为——安装后的显示名、安装目录、userData 由 #3/#4 决定。
 - **`apps/desktop/package.json` 的 `name` 保持 `@deepseek-ai/dsh-desktop`。** 改它会连带打断根
   `package.json` 里的 `pnpm --filter @deepseek-ai/dsh-desktop` 脚本和仓库的包命名约束。
-  身份隔离改由改动 #3 的 `extraMetadata.name` 在打包产物中完成，工作区包名保持不变。
+  身份隔离改由改动 #3 在打包产物中完成，工作区包名保持不变。
 - **`~/.agents` 不变。** 它由 `DSH_AGENTS_HOME` 控制，存放用户级 `AGENTS.md` 与 `skills/`，
   官方版与本 fork 共享。要隔离就在启动前设置 `DSH_AGENTS_HOME`。
 - **文档里的 `~/.dsh` 文案未同步。** 见"已知限制"。
@@ -42,70 +47,113 @@
 | 项 | 官方版 | 本 fork |
 |---|---|---|
 | Harness 数据根 | `~/.dsh` | `~/.raindsh` |
+| 已安装插件 | `~/.dsh/profiles/desktop` | `~/.raindsh/profiles/desktop` |
 | Electron userData | `%APPDATA%\@deepseek-ai\dsh-desktop` | `%APPDATA%\@rainroom\dsh-desktop` |
 | 单实例锁 | 与官方版互斥 | 独立，可与官方版同时运行 |
+| 程序显示名 | DeepSeek Harness | Rain Harness |
 | 安装目录 | `%LOCALAPPDATA%\Programs\DeepSeek Harness` | `%LOCALAPPDATA%\Programs\Rain Harness` |
-| 安装器标识 | 由 `DSH_DESKTOP_APP_ID` 决定 | `fork/windows.env.template` 中的 `com.rainroom.harness` |
 | URL 协议 | `dsh://` | `raindsh://` |
+| 自动更新 | 有 | 无（手动重新打包） |
 | 共享 agent 配置 | `~/.agents` | `~/.agents`（未隔离） |
 
-## 打包（Windows）
+## 使用方式（绿色版）
 
-上游强制要求一份 `apps/desktop/.env.windows`（被 git 忽略），其中包含安装器标识和
-强制更新策略来源。本 fork 用模板生成它：
+绿色版是一个免安装目录，双击其中的 `Rain Harness.exe` 即可启动，不需要管理员权限，
+不会写卸载项。启动后它自己拉起内置 Host 进程，随窗口关闭一起退出，**不需要常驻任何服务**。
+
+数据落在两处，都独立于官方版，重启应用和重启电脑都不会丢：
+
+| 内容 | 位置 |
+|---|---|
+| 会话、凭据、工作区、日志、缓存、**已安装插件** | `~/.raindsh`（插件在 `~/.raindsh/profiles/desktop`） |
+| 窗口设置、快捷键、语言缓存、浏览器存储 | `%APPDATA%\@rainroom\dsh-desktop` |
+
+换到新版本时，只要保留这两个目录，覆盖程序目录即可继续使用原有数据。
+
+### 桌面图标
+
+绿色版不自带快捷方式，用一条命令创建（指向实际的 exe 路径）：
 
 ```powershell
-cd D:\E\AI_DEV_PROJECT\dsh-use
+$exe = '<绿色版目录>\Rain Harness.exe'
+$link = Join-Path ([Environment]::GetFolderPath('Desktop')) 'Rain Harness.lnk'
+$shell = New-Object -ComObject WScript.Shell
+$s = $shell.CreateShortcut($link)
+$s.TargetPath = $exe
+$s.WorkingDirectory = Split-Path $exe
+$s.IconLocation = $exe
+$s.Save()
+```
+
+## 打包
+
+只需要一次前置准备：`apps/desktop/.env.windows`（被 git 忽略）必须存在。改动 #6/#7 之后，
+unsigned 构建只需其中的安装器身份：
+
+```powershell
 Copy-Item fork\windows.env.template apps\desktop\.env.windows
-# 按文件内注释填好 DOWNLOAD_TEST_ORIGIN 等占位项
-pnpm install
+# 或直接写一行：DSH_DESKTOP_APP_ID=com.rainroom.harness
+```
+
+### 免安装绿色版（日常使用）
+
+```powershell
+cd D:\E\AI_DEV_PROJECT\dsh-use\apps\desktop
+pnpm exec tsx scripts/package-target.ts win-x64 --unsigned --dir
+```
+
+产物是 `win-unpacked` 目录，里面有 `Rain Harness.exe`。
+
+### 带安装程序的版本（需要开始菜单、卸载项时）
+
+```powershell
 pnpm run package:desktop:win:x64:unsigned
 ```
 
-产物在 `apps/desktop/.desktop-build/` 下的输出目录，文件名形如
-`rain-harness-<version>-win-x64.exe`。
+### 打包前快速校验配置
 
-`--unsigned` 变体不需要签名证书，但它仍然会校验强制更新来源（
-`DSH_DESKTOP_MANDATORY_UPDATE_TEST_ORIGIN` / `_PROD_ORIGIN`，必须是合法的 HTTPS
-origin），缺失会直接报错退出。见"已知限制"。
-
-### 安装后的验证
-
-1. `%APPDATA%` 下应出现 `@rainroom\dsh-desktop`，官方的 `@deepseek-ai\dsh-desktop` 不受影响。
-2. 帮助菜单的"关于"显示 Rain Harness，版本号正常。
-3. 两个客户端同时启动：都能保持打开，互不退出（单实例锁已分离）。
-4. 新建一个会话，确认写入 `~/.raindsh/sessions`，`~/.dsh/sessions` 的修改时间不变。
-5. 设置项（快捷键、语言、主题）互不影响。
-
-## 同步上游
+不构建，只验证配置与工具链，几秒即出结果：
 
 ```powershell
-git fetch upstream master
-git merge upstream/master        # 或 git rebase upstream/master
+cd apps\desktop
+pnpm exec tsx scripts/package-target.ts win-x64 --unsigned --check
 ```
 
-冲突几乎只会出现在上表 9 个文件里。逐个按下表核对即可；若上游改动了同一处语义，
-优先保留上游结构、把 fork 的值重新填进去，并更新本表。
+注意：不带 `--unsigned` 的 `--check` 走的是签名发布路径，仍会要求策略来源，因此不要用它
+判断本 fork 能否打包。
 
-同步后必须重新确认的两件事：
+## 每次更新的流程
+
+```powershell
+cd D:\E\AI_DEV_PROJECT\dsh-use
+git fetch upstream master
+git merge upstream/master          # 冲突基本只出现在上表文件
+pnpm install                       # 依赖有变化时
+cd apps\desktop
+pnpm exec tsx scripts/package-target.ts win-x64 --unsigned --dir
+# 用新的 win-unpacked 覆盖旧的程序目录；不要删 ~/.raindsh 与 %APPDATA%\@rainroom\dsh-desktop
+```
+
+## 同步上游后必须复查
 
 1. `DSH_HOME_DIR_NAME` 仍是 `.raindsh`（上游若重命名或移动该常量要跟随）。
-2. `electron-builder-config.mjs` 的 `extraMetadata.name` / `productName` / `protocols`
+2. `electron-builder-config.mjs` 的 `extraMetadata.name`、`productName`、`protocols`
    与 `main.ts` 的协议字符串仍然一致。
+3. unsigned 的两处策略例外（改动 #6/#7）仍在，否则打包会重新要求 HTTPS 策略来源。
 
 ## 已知限制
 
-- **文档与快照仍写着 `~/.dsh`。** 仓库内约 69 处 `~/.dsh` 出现在文档与测试快照里，
-  本 fork 未同步。因此 `pnpm run doc-sync`、部分快照测试会失败。这是有意的取舍：
-  同步这些文案会显著扩大每次上游合并的冲突面，而它们不影响产品行为。
-- **`pnpm run test:coverage` 不会全绿。** 同上的文档/快照差异。
-- **自动更新未改指向。** 产物带的是上游的更新通道配置。若要让本 fork 自行更新，需要
-  自己的发布源；共享上游更新源会导致本 fork 被官方版本覆盖。见改动记录后续待办。
-- **未验证实际安装。** 本次只完成源码改动与记录，尚未执行 `pnpm install` 与打包，
-  上表"安装后的验证"步骤待首次打包后逐条确认。
+- **文档与快照仍写着 `~/.dsh`。** 仓库内约 69 处 `~/.dsh` 出现在文档与测试快照里，本 fork
+  未同步。因此 `pnpm run doc-sync`、部分快照测试会失败。这是有意的取舍：同步这些文案会
+  显著扩大每次上游合并的冲突面，而它们不影响产品行为。
+- **没有自动更新。** 应用不带更新源，也不会检查更新；升级只能靠重新打包。
+- **`~/.agents` 共享。** 用户级 `AGENTS.md` 与 `skills/` 仍与官方版共用。
+- **绿色版不是数据便携版。** 数据写在用户目录（见上表），不是 exe 同级目录；删掉程序目录
+  不会删除数据，但也不会把数据带走。
 
 ## 待办
 
-- [ ] 首次 `pnpm install` + 打包，跑完"安装后的验证"五项。
-- [ ] 决定自动更新策略：禁用、改指向，或保留（接受被官方版本替换）。
-- [ ] 若需要 workspace/skills 也隔离，在启动脚本里设置 `DSH_AGENTS_HOME`。
+- [ ] 首次绿色版构建完成后，逐项验证：桌面图标启动、与官方版同时运行、
+      会话写入 `~/.raindsh`、安装的插件落在 `~/.raindsh/profiles/desktop`、重启后数据仍在。
+- [ ] 如需数据跟着程序目录走（真正的便携版），需要额外改动：启动时把 `DSH_HOME` 与
+      Electron userData 指向 exe 同级目录。
