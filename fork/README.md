@@ -28,6 +28,7 @@
 | 8 | `apps/desktop/src/main.ts` | `setAsDefaultProtocolClient('raindsh')`、`raindsh://open` | 跟随改动 #5，注册与解析保持一致。 |
 | 9 | `apps/desktop/tests/welcome-startup.spec.ts` | 两处 `dsh://open` 断言改为 `raindsh://open` | 跟随改动 #8。 |
 | 10 | `packages/util/home-paths/tests/home-paths.spec.ts` | 默认目录断言改为 `.raindsh` / `~/.raindsh` | 跟随改动 #1。`expandHomePath` 用例仍用任意字面量，与默认值无关，保持不变。 |
+| 11 | `apps/desktop/scripts/electron-builder-config.mjs` + `resources/icon-windows.ico` | `win.icon` 改用预生成的多尺寸 ICO，并提交该文件 | electron-builder 的 PNG→ICO 转换会调起 WASM 图标工具，需要 WASM SIMD；不支持 SIMD 的机器（含部分虚拟机）会在打包最后一步失败。用已生成的 ICO 绕开这一步。 |
 
 ### 刻意未改动
 
@@ -121,6 +122,42 @@ pnpm exec tsx scripts/package-target.ts win-x64 --unsigned --check
 
 注意：不带 `--unsigned` 的 `--check` 走的是签名发布路径，仍会要求策略来源，因此不要用它
 判断本 fork 能否打包。
+
+### 重新生成 Windows 图标
+
+`resources/icon-windows.ico` 由同目录的 `icon-windows.png`（1024×1024）生成，含 16/32/48/64/128/256
+六种尺寸。换了矢量/位图源之后要重新生成，否则打包会用旧图标：
+
+```powershell
+Add-Type -AssemblyName System.Drawing
+$root = 'D:\E\AI_DEV_PROJECT\dsh-use\apps\desktop\resources'
+$sizes = @(16,32,48,64,128,256)
+$image = [System.Drawing.Image]::FromFile("$root\icon-windows.png")
+$pngs = foreach ($s in $sizes) {
+  $bmp = New-Object System.Drawing.Bitmap($s,$s)
+  $g = [System.Drawing.Graphics]::FromImage($bmp)
+  $g.InterpolationMode = 'HighQualityBicubic'; $g.PixelOffsetMode = 'HighQuality'
+  $g.DrawImage($image,0,0,$s,$s); $g.Dispose()
+  $ms = New-Object System.IO.MemoryStream
+  $bmp.Save($ms,[System.Drawing.Imaging.ImageFormat]::Png); $bmp.Dispose()
+  $ms.ToArray()
+}
+$image.Dispose()
+$fs = [System.IO.File]::Create("$root\icon-windows.ico")
+$bw = New-Object System.IO.BinaryWriter($fs)
+$bw.Write([UInt16]0); $bw.Write([UInt16]1); $bw.Write([UInt16]$sizes.Count)
+$offset = 6 + 16 * $sizes.Count
+for ($i=0; $i -lt $sizes.Count; $i++) {
+  $d = $pngs[$i]; $s = $sizes[$i]
+  $dim = if ($s -ge 256) { 0 } else { $s }
+  $bw.Write([Byte]$dim); $bw.Write([Byte]$dim); $bw.Write([Byte]0); $bw.Write([Byte]0)
+  $bw.Write([UInt16]1); $bw.Write([UInt16]32)
+  $bw.Write([UInt32]$d.Length); $bw.Write([UInt32]$offset)
+  $offset += $d.Length
+}
+foreach ($d in $pngs) { $bw.Write($d) }
+$bw.Flush(); $bw.Dispose(); $fs.Dispose()
+```
 
 ## 每次更新的流程
 

@@ -252,7 +252,9 @@ export function createElectronBuilderConfig(
       )
     },
     win: {
-      icon: fileURLToPath(new URL('../resources/icon-windows.png', import.meta.url)),
+      // Fork: a committed .ico skips electron-builder's PNG-to-ICO conversion, whose WASM icon
+      // tool needs WASM SIMD and fails on hosts without it. Regenerate with the snippet in fork/README.
+      icon: fileURLToPath(new URL('../resources/icon-windows.ico', import.meta.url)),
       forceCodeSigning: !unsigned,
       signtoolOptions: {
         sign: windowsSigner,
