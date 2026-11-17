@@ -63,10 +63,23 @@
 - **不要在两个客户端里同时操作同一个会话。** 会话目录共享，双开会造成冲突写入。
 - 插件各自安装：官方版的插件在 `profiles/desktop`，本 fork 的在 `profiles/rain-desktop`，互不影响，
   但磁盘占用是两份。
+- **界面里安装插件不需要指定 profile。** 插件管理器的 pnpm 工作目录就是本应用自己的 profile 目录，即
+  `~/.dsh/profiles/rain-desktop`，等价于 `dsh plugin --profile rain-desktop add …`；那条命令只是等价写法。
 - 升级本 fork 只替换程序目录，`~/.dsh` 与 `%APPDATA%\@rainroom\dsh-desktop` 都不会被删除。
 - **切换 profile 后旧配置不会自动迁移。** 模型、供应商、界面开关都写在
   `~/.dsh/profiles/<profile>/cordis.patch.yml` 里；换 profile 名后需要把旧的那个文件复制到新
   profile 目录，否则会看起来像"配置丢了"。插件目录 `node_modules` 同理，需要重新安装。
+
+### 本机 profile 私有配置（换机或换 profile 时重做）
+
+下面两个文件属于机器配置，不在仓库里；profile 重建后需要重新放置，否则会表现成"配置丢了 / 私服插件装不上"。
+
+| 文件 | 内容 |
+|---|---|
+| `~/.dsh/profiles/rain-desktop/cordis.patch.yml` | 模型、供应商（如 `provider: sin`、`baseURL`）、界面开关 |
+| `~/.dsh/profiles/rain-desktop/.npmrc` | 私服作用域映射，例如 `@sinexcel:registry=…/sinexcel-deepseek-harness-local-npm/` |
+
+私服认证 token 写在 `%USERPROFILE%\.npmrc`，按相同的 host 与路径作键；profile 的 `.npmrc` 只放作用域映射，不放 token。
 
 ## 打包
 
