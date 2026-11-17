@@ -191,9 +191,19 @@ pnpm exec tsx scripts/package-target.ts win-x64 --unsigned --dir
 - **绿色版不是数据便携版。** 数据写在用户目录（见上表），不是 exe 同级目录；删掉程序目录
   不会删除数据，但也不会把数据带走。
 
+## 已验证
+
+2026-11-17，在本分支完整跑通 `tsx scripts/package-target.ts win-x64 --unsigned --dir`，退出码 0，
+产物在 `.desktop-build/targets/win-x64/unsigned-artifacts/win-unpacked`：
+
+- 打包后的冒烟测试通过：内置运行时、Web 服务、CLI 离线插件安装与卸载、Office 技能、文档转换。
+- 启动 `Rain Harness.exe` 后生成 `~/.raindsh`（profiles、sessions、storages、凭据、匿名 ID）
+  与 `%APPDATA%\@rainroom\dsh-desktop`，而官方 `~/.dsh` 的时间戳没有变化。
+- 桌面快捷方式 `Rain Harness.lnk` 指向该 exe；重新打包后路径不变，快捷方式无需重建。
+
 ## 待办
 
-- [ ] 首次绿色版构建完成后，逐项验证：桌面图标启动、与官方版同时运行、
-      会话写入 `~/.raindsh`、安装的插件落在 `~/.raindsh/profiles/desktop`、重启后数据仍在。
+- [ ] 与官方版**同时运行**尚未实测。单实例锁按 Electron userData 区分，两者路径不同，结构上独立，
+      但还没有一次"两边同开"的验证。
 - [ ] 如需数据跟着程序目录走（真正的便携版），需要额外改动：启动时把 `DSH_HOME` 与
       Electron userData 指向 exe 同级目录。
