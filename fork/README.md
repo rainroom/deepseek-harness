@@ -72,20 +72,16 @@
 
 换到新版本时，只要保留这两个目录，覆盖程序目录即可继续使用原有数据。
 
-### 桌面图标
+### 桌面图标与安装位置
 
-绿色版不自带快捷方式，用一条命令创建（指向实际的 exe 路径）：
+不要把快捷方式指向仓库内的构建目录：`pnpm run clean` 或删掉 `.desktop-build` 都会让它失效。
+`fork/install-green.ps1` 把构建镜像到一个稳定目录，并让桌面快捷方式固定指向那里：
 
-```powershell
-$exe = '<绿色版目录>\Rain Harness.exe'
-$link = Join-Path ([Environment]::GetFolderPath('Desktop')) 'Rain Harness.lnk'
-$shell = New-Object -ComObject WScript.Shell
-$s = $shell.CreateShortcut($link)
-$s.TargetPath = $exe
-$s.WorkingDirectory = Split-Path $exe
-$s.IconLocation = $exe
-$s.Save()
-```
+- 程序目录：`D:\E\AI_DEV_PROJECT\dsh-use-app`
+- 快捷方式：`<桌面>\Rain Harness.lnk` → `dsh-use-app\Rain Harness.exe`
+
+重新打包只替换程序目录里的文件，路径不变，快捷方式因此一直有效。可用参数覆盖默认值：
+`-Repo`、`-InstallDir`、`-ProductName`、`-SkipBuild`、`-NoShortcut`。
 
 ## 打包
 
@@ -99,12 +95,19 @@ Copy-Item fork\windows.env.template apps\desktop\.env.windows
 
 ### 免安装绿色版（日常使用）
 
+一条命令完成"构建 → 关闭旧实例 → 镜像到稳定目录 → 修好快捷方式"：
+
 ```powershell
-cd D:\E\AI_DEV_PROJECT\dsh-use\apps\desktop
-pnpm exec tsx scripts/package-target.ts win-x64 --unsigned --dir
+powershell -NoProfile -ExecutionPolicy Bypass -File D:\E\AI_DEV_PROJECT\dsh-use\fork\install-green.ps1
 ```
 
-产物是 `win-unpacked` 目录，里面有 `Rain Harness.exe`。
+只想把现有构建重新部署一次（跳过约 20 分钟的构建）：
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File D:\E\AI_DEV_PROJECT\dsh-use\fork\install-green.ps1 -SkipBuild
+```
+
+脚本只写程序目录，`~/.raindsh` 与 `%APPDATA%\@rainroom\dsh-desktop` 一律不动。
 
 ### 带安装程序的版本（需要开始菜单、卸载项时）
 
@@ -167,10 +170,13 @@ cd D:\E\AI_DEV_PROJECT\dsh-use
 git fetch upstream master
 git merge upstream/master          # 冲突基本只出现在上表文件
 pnpm install                       # 依赖有变化时
-cd apps\desktop
-pnpm exec tsx scripts/package-target.ts win-x64 --unsigned --dir
-# 用新的 win-unpacked 覆盖旧的程序目录；不要删 ~/.raindsh 与 %APPDATA%\@rainroom\dsh-desktop
+
+# 构建 + 部署 + 修好快捷方式（会先关闭正在运行的旧实例）
+powershell -NoProfile -ExecutionPolicy Bypass -File fork\install-green.ps1
 ```
+
+升级全程不碰这两个目录，会话、凭据与已装插件原样保留：`~/.raindsh`、
+`%APPDATA%\@rainroom\dsh-desktop`。它们在程序目录之外，正常升级不会动到；**不要手动删除**。
 
 ## 同步上游后必须复查
 
@@ -193,13 +199,15 @@ pnpm exec tsx scripts/package-target.ts win-x64 --unsigned --dir
 
 ## 已验证
 
-2026-11-17，在本分支完整跑通 `tsx scripts/package-target.ts win-x64 --unsigned --dir`，退出码 0，
-产物在 `.desktop-build/targets/win-x64/unsigned-artifacts/win-unpacked`：
+2026-11-17 实测：
 
-- 打包后的冒烟测试通过：内置运行时、Web 服务、CLI 离线插件安装与卸载、Office 技能、文档转换。
-- 启动 `Rain Harness.exe` 后生成 `~/.raindsh`（profiles、sessions、storages、凭据、匿名 ID）
-  与 `%APPDATA%\@rainroom\dsh-desktop`，而官方 `~/.dsh` 的时间戳没有变化。
-- 桌面快捷方式 `Rain Harness.lnk` 指向该 exe；重新打包后路径不变，快捷方式无需重建。
+- `tsx scripts/package-target.ts win-x64 --unsigned --dir` 完整跑通，退出码 0，含冒烟测试：
+  内置运行时、Web 服务、CLI 离线插件安装与卸载、Office 技能、文档转换。
+- 启动应用后生成 `~/.raindsh`（profiles、sessions、storages、凭据、匿名 ID）与
+  `%APPDATA%\@rainroom\dsh-desktop`，官方 `~/.dsh` 的时间戳没有变化。
+- `fork/install-green.ps1 -SkipBuild` 把约 1.06 GB 的构建镜像到 `D:\E\AI_DEV_PROJECT\dsh-use-app`，
+  桌面快捷方式改为指向该目录。
+- 从稳定目录启动后应用正常运行，且 `~/.raindsh` 下各目录时间戳未变——原有数据被沿用，没有重建。
 
 ## 待办
 
