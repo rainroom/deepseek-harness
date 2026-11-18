@@ -60,7 +60,9 @@
 
 ## 使用须知
 
-- 两个客户端可以同时打开，互不退出。
+- 两个客户端可以同时打开，互不退出。共用的 `profiles/desktop/lock` 只在启动时的 profile 操作期间
+  持有（`apps/desktop/src/project-manager.ts` 的 `withLock`，事毕立即删除），不是常驻锁；两者同一秒
+  启动时，后启动的会报 `desktop project: another profile operation is active`，重开即可。
 - **不要在两个客户端里同时操作同一个会话。** 会话目录共享，双开会造成冲突写入。
 - 插件集合共享：界面里安装的插件写进 `~/.dsh/profiles/desktop`，两个客户端都会加载；停用或删除
   同理，会同时影响官方版。磁盘上只有一份。
@@ -178,17 +180,23 @@ powershell -NoProfile -ExecutionPolicy Bypass -File fork\install-green.ps1
 
 ## 已验证
 
+2026-11-18 实测（共享 `profiles/desktop`）：
+
+- 绿色版启动后写入 `~/.dsh/profiles/desktop`，`profiles/rain-desktop` 保持不变。
+- 绿色版与官方 `D:\E\develop\ai\dsh` 同时运行：两侧各 5 个进程，互不退出；
+  `@rainroom/dsh-desktop` 与 `@deepseek-ai/dsh-desktop` 的 userData 与单实例锁互不干扰。
+- 同一个 profile、同一个版本 `0.2.2-rc.3`：官方客户端启动后写入
+  `~/.dsh/logs/ds-harness-remote/host.log`，同一分钟启动的绿色版没有写入。插件宿主在本 fork 的
+  构建里始终不启动，与 profile 选择无关。
+
 2026-11-17 实测：
 
 - `tsx scripts/package-target.ts win-x64 --unsigned --dir` 完整跑通，退出码 0，含冒烟测试。
 - 绿色版部署到 `D:\E\AI_DEV_PROJECT\dsh-use-app`，桌面快捷方式指向该目录。
 - 早前版本（`.raindsh` + `profiles/desktop`）已验证过：数据写入自有 home、官方 `~/.dsh` 未被触碰。
-- 绿色版与官方 `D:\E\develop\ai\dsh` 同时运行正常：`@rainroom/dsh-desktop` 与
-  `@deepseek-ai/dsh-desktop` 的 userData 与单实例锁互不干扰。
 
 ## 待办
 
-- [ ] 本轮构建后确认 `ds-harness-remote` 在共享 `profiles/desktop` 下能否出二维码；若仍不能，
-      结论是该插件只在官方发行的安装包里工作，本 fork 不再追这条线。
+- [x] `ds-harness-remote` 在共享 `profiles/desktop` 下仍不出二维码（见"已知限制"），不再追查。
 - [ ] 确认 `~/.dsh/profiles/rain-desktop` 已无用途后删除；磁盘上另有 `~/.raindsh` 属更早实验残留。
 - [ ] 如需数据完全隔离又要插件可用，只能逐插件适配其取数逻辑，无法在本 fork 内统一解决。
