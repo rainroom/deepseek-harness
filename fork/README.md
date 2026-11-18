@@ -173,8 +173,11 @@ powershell -NoProfile -ExecutionPolicy Bypass -File fork\install-green.ps1
 - **会话与凭据共享。** 这是换取插件兼容性的代价：两个客户端看到同一份会话列表。
 - **同一会话不可双开。** 两端同时操作会造成冲突写入。
 - **没有自动更新。** 应用不带更新源，升级只能靠重新打包。
-- **`ds-harness-remote` 类插件仍不可用。** 它们要求 Desktop profile 暴露 `webServer` 服务；
-  当前 DSH 在桌面宿主下取不到，属于插件与宿主的能力不匹配，与本 fork 的改动无关。
+- **`ds-harness-remote` 需要先登录账号，不是接口不兼容。** 未登录时插件宿主连不上
+  `https://dsh.r2049.cn`，服务端返回 `401 ACCOUNT_AUTH_REQUIRED`，界面显示为"控制通道仍在启动"。
+  在 Remote 设置里登录（或从已登录的 Remote 客户端授权本机）后即可使用。插件日志在
+  `~/.dsh/logs/ds-harness-remote/host.log`，身份与凭据在 `~/.dsh/ds-harness-remote/servers/<hash>/`，
+  该目录位于 Harness home 下，两个客户端共用同一份登录状态。
 - **文档与快照仍写着 `~/.dsh` 的旧描述**，与现状一致，无需同步。
 
 ## 已验证
