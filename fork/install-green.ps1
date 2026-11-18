@@ -13,7 +13,8 @@ Usage:
 param(
   [string]$Repo = 'D:\E\AI_DEV_PROJECT\dsh-use',
   [string]$InstallDir = 'D:\E\AI_DEV_PROJECT\dsh-use-app',
-  [string]$ProductName = 'Rain Harness',
+  [string]$ProductName = 'DeepSeek Harness',
+  [string]$ShortcutName = 'Rain Harness',
   [switch]$SkipBuild,
   [switch]$NoShortcut
 )
@@ -61,13 +62,16 @@ if (-not $SkipBuild) {
 $source = Join-Path $desktop '.desktop-build\targets\win-x64\unsigned-artifacts\win-unpacked'
 if (-not (Test-Path (Join-Path $source "$ProductName.exe"))) { Fail "no build output at $source" }
 
-# Running instances hold file locks that would break the mirror.
-$running = @(Get-Process -Name $ProductName -ErrorAction SilentlyContinue)
+# Running instances of THIS installation hold file locks that would break the mirror. Match the
+# executable path so the official DeepSeek Harness installation is never closed.
+$running = @(Get-Process -Name $ProductName -ErrorAction SilentlyContinue |
+  Where-Object { $_.Path -and $_.Path.StartsWith($InstallDir, [StringComparison]::OrdinalIgnoreCase) })
 if ($running.Count -gt 0) {
-  Write-Host "install-green: closing $($running.Count) running instance(s)"
+  Write-Host "install-green: closing $($running.Count) running instance(s) from $InstallDir"
   $running | ForEach-Object { [void]$_.CloseMainWindow() }
   Start-Sleep -Seconds 5
   Get-Process -Name $ProductName -ErrorAction SilentlyContinue |
+    Where-Object { $_.Path -and $_.Path.StartsWith($InstallDir, [StringComparison]::OrdinalIgnoreCase) } |
     Stop-Process -Force -ErrorAction SilentlyContinue
   Start-Sleep -Seconds 2
 }
@@ -82,7 +86,7 @@ $exe = Join-Path $InstallDir "$ProductName.exe"
 if (-not (Test-Path $exe)) { Fail "missing $exe after mirror" }
 
 if (-not $NoShortcut) {
-  $link = Join-Path ([Environment]::GetFolderPath('Desktop')) "$ProductName.lnk"
+  $link = Join-Path ([Environment]::GetFolderPath('Desktop')) "$ShortcutName.lnk"
   $shell = New-Object -ComObject WScript.Shell
   $shortcut = $shell.CreateShortcut($link)
   $shortcut.TargetPath = $exe

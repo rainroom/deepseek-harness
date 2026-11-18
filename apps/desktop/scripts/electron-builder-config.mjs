@@ -123,7 +123,10 @@ export function createElectronBuilderConfig(
       ...buildVersion === productVersion ? {} : { version: buildVersion },
       ...packaged === undefined ? {} : { dshBuildCommit: packaged.commit, dshBuildDirty: packaged.dirty },
     },
-    productName: 'Rain Harness',
+    // Fork: keep the upstream product name. Runtime assets hardcode it — for example
+    // resources/runtime/cli/bin/dsh.cmd launches "<app>/DeepSeek Harness.exe" — so renaming the
+    // product breaks the bundled CLI. Coexistence comes from extraMetadata.name, not this name.
+    productName: 'DeepSeek Harness',
     // The default copyright uses author.name; this line names the product instead.
     copyright: `Copyright © ${new Date().getFullYear()} \${productName}`,
     // Unsigned builds carry their own suffix so a shared file can never pass for a release artifact.

@@ -13,7 +13,7 @@ const target = resolveDesktopBuildTarget()
 const windows = target === 'win-x64'
 const artifacts = desktopArtifactOutput(paths, { unsigned: values.unsigned, skipNotarization: values['skip-notarization'] }).directory
 // Fork: mirrors productName in electron-builder-config.mjs; keep both in sync.
-const PRODUCT_NAME = 'Rain Harness'
+const PRODUCT_NAME = 'DeepSeek Harness'
 const application = windows ? join(artifacts, 'win-unpacked')
   : join(artifacts, target === 'mac-arm64' ? 'mac-arm64' : 'mac', `${PRODUCT_NAME}.app`, 'Contents')
 const resources = join(application, windows ? 'resources' : 'Resources')

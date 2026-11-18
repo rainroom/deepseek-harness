@@ -22,7 +22,7 @@
 |---|---|---|---|
 | 1 | `apps/desktop/src/paths.ts` | Desktop profile 由 `profiles/desktop` 改为 `profiles/rain-desktop`（含 `lock`） | 官方桌面端独占 `profiles/desktop` 并加锁；不换名就无法并行运行，也会互相污染插件集合。 |
 | 2 | `apps/desktop/scripts/electron-builder-config.mjs` | `extraMetadata.name` 设为 `'@rainroom/dsh-desktop'` | Electron 从打包后的 manifest 取 `app.name`，据此决定 userData 目录与单实例锁名。这是两个客户端能同时运行的另一半。 |
-| 3 | 同上 | `productName` 改为 `'Rain Harness'` | 决定安装目录、可执行文件名、卸载项显示名。同名会被当作升级覆盖。 |
+| 3 | 同上 | `productName` **保持上游 `'DeepSeek Harness'`** | 运行时资产硬编码了产品名，例如 `resources/runtime/cli/bin/dsh.cmd` 启动 `<app>/DeepSeek Harness.exe`；改名会让内置 CLI 与依赖它的功能失效。共存由 `extraMetadata.name` 负责，不需要改产品名。 |
 | 4 | 同上 | `protocols` 改为 `{ name: 'Rain Harness', schemes: ['raindsh'] }` | 两个客户端不再抢同一个 `dsh://` 协议处理器。 |
 | 5 | 同上 | unsigned 构建不再解析强制更新策略 | 上游只对 macOS unsigned 免除，Windows 仍强制要求 HTTPS 策略来源。本 fork 不参与自动更新，该要求只会挡住本地打包。 |
 | 6 | `apps/desktop/scripts/desktop-package-environment.mjs` | 同上：`validateDesktopPackageEnvironment` 只在非 unsigned 时解析策略 | 跟随改动 #5，否则校验阶段仍会要求策略来源。 |
@@ -52,8 +52,8 @@
 | Desktop profile（插件集合、运行锁） | `~/.dsh/profiles/desktop` | `~/.dsh/profiles/rain-desktop`（独立） |
 | Electron userData | `%APPDATA%\@deepseek-ai\dsh-desktop` | `%APPDATA%\@rainroom\dsh-desktop`（独立） |
 | 单实例锁 | 按 userData | 独立，可与官方版同时运行 |
-| 程序显示名 | DeepSeek Harness | Rain Harness |
-| 安装目录 | `%LOCALAPPDATA%\Programs\DeepSeek Harness` | `%LOCALAPPDATA%\Programs\Rain Harness` |
+| 程序显示名 | DeepSeek Harness | DeepSeek Harness（未改名） |
+| 安装目录 | `%LOCALAPPDATA%\Programs\DeepSeek Harness` | 绿色版目录 `D:\E\AI_DEV_PROJECT\dsh-use-app` |
 | URL 协议 | `dsh://` | `raindsh://` |
 | 自动更新 | 有 | 无（手动重新打包） |
 
@@ -105,7 +105,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File D:\E\AI_DEV_PROJECT\dsh-use\
 `fork/install-green.ps1` 把构建镜像到稳定目录，并让桌面快捷方式固定指向那里：
 
 - 程序目录：`D:\E\AI_DEV_PROJECT\dsh-use-app`
-- 快捷方式：`<桌面>\Rain Harness.lnk` → `dsh-use-app\Rain Harness.exe`
+- 快捷方式：`<桌面>\Rain Harness.lnk` → `dsh-use-app\DeepSeek Harness.exe`（图标名与产品名可以不同）
 
 重新打包只替换程序目录里的文件，路径不变，快捷方式因此一直有效。可用参数覆盖默认值：
 `-Repo`、`-InstallDir`、`-ProductName`、`-SkipBuild`、`-NoShortcut`。
@@ -146,7 +146,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File fork\install-green.ps1
 2. `~/.dsh/profiles/rain-desktop` 存在，`profiles/desktop` 未被创建或修改。
 3. 官方客户端仍能同时打开，两者互不退出。
 4. 本 fork 装过的插件在 `~/.dsh/profiles/rain-desktop`，官方版插件列表不受影响。
-5. 快捷方式目标仍是 `D:\E\AI_DEV_PROJECT\dsh-use-app\Rain Harness.exe`。
+5. 快捷方式目标仍是 `D:\E\AI_DEV_PROJECT\dsh-use-app\DeepSeek Harness.exe`。
 
 ## 故障处理
 
@@ -164,8 +164,8 @@ powershell -NoProfile -ExecutionPolicy Bypass -File fork\install-green.ps1
 2. `electron-builder-config.mjs` 的 `extraMetadata.name`、`productName`、`protocols`
    与 `main.ts` 的协议字符串仍然一致。
 3. unsigned 的两处策略例外（改动 #5/#6）仍在，否则打包会重新要求 HTTPS 策略来源。
-4. 产品名 `Rain Harness` 出现在两处并需同步：`electron-builder-config.mjs` 的 `productName`
-   与 `smoke-packaged-runtime.ts` 的 `PRODUCT_NAME`。
+4. 产品名两处需同步：`electron-builder-config.mjs` 的 `productName` 与 `smoke-packaged-runtime.ts` 的
+   `PRODUCT_NAME`，**都必须是 `'DeepSeek Harness'`**——运行时资产里硬编码了这个名字。
 5. `DSH_HOME_DIR_NAME` 仍是 `.dsh`（本 fork 不修改它）。
 
 ## 已知限制
