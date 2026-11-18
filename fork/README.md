@@ -5,37 +5,38 @@
 
 ## 目的
 
-产出一个能与官方桌面端**同时安装、同时运行**的独立客户端，并保持第三方插件可用：
+产出能与官方桌面端**同时安装、同时运行**的独立客户端，并保持第三方插件可用：
 
 - **数据根沿用默认的 `~/.dsh`**。插件生态普遍按这个默认目录取数，改成自定义目录会让它们失效；
   因此这里接受与官方版共享会话、凭据、storages。
-- **Desktop profile 改名为 `rain-desktop`**。官方版占用 `profiles/desktop` 并持有其锁，改名后
-  两者互不争夺，各自管理自己的插件集合。
+- **Desktop profile 沿用上游的 `profiles/desktop`**，与官方版是同一个。曾改为 `rain-desktop` 试图
+  隔离插件集合，但 `ds-harness-remote` 在两种 profile 下都没能加载，隔离只换来配置迁移成本，已还原。
 - **Electron 用户数据、单实例锁、安装身份、URL 协议保持独立**，这是"能同时开"的关键。
 - 不使用自动更新：每次升级由本仓库重新打包完成。
 
 ## 改动清单
 
-改动刻意保持最小，只触碰身份、profile 归属和更新策略。
+改动刻意保持最小，只触碰身份与更新策略。
 
 | # | 文件 | 改动 | 原因 |
 |---|---|---|---|
-| 1 | `apps/desktop/src/paths.ts` | Desktop profile 由 `profiles/desktop` 改为 `profiles/rain-desktop`（含 `lock`） | 官方桌面端独占 `profiles/desktop` 并加锁；不换名就无法并行运行，也会互相污染插件集合。 |
-| 2 | `apps/desktop/scripts/electron-builder-config.mjs` | `extraMetadata.name` 设为 `'@rainroom/dsh-desktop'` | Electron 从打包后的 manifest 取 `app.name`，据此决定 userData 目录与单实例锁名。这是两个客户端能同时运行的另一半。 |
-| 3 | 同上 | `productName` **保持上游 `'DeepSeek Harness'`** | 运行时资产硬编码了产品名，例如 `resources/runtime/cli/bin/dsh.cmd` 启动 `<app>/DeepSeek Harness.exe`；改名会让内置 CLI 与依赖它的功能失效。共存由 `extraMetadata.name` 负责，不需要改产品名。 |
-| 4 | 同上 | `protocols` 改为 `{ name: 'Rain Harness', schemes: ['raindsh'] }` | 两个客户端不再抢同一个 `dsh://` 协议处理器。 |
-| 5 | 同上 | unsigned 构建不再解析强制更新策略 | 上游只对 macOS unsigned 免除，Windows 仍强制要求 HTTPS 策略来源。本 fork 不参与自动更新，该要求只会挡住本地打包。 |
-| 6 | `apps/desktop/scripts/desktop-package-environment.mjs` | 同上：`validateDesktopPackageEnvironment` 只在非 unsigned 时解析策略 | 跟随改动 #5，否则校验阶段仍会要求策略来源。 |
-| 7 | `apps/desktop/src/main.ts` | `setAsDefaultProtocolClient('raindsh')`、`raindsh://open` | 跟随改动 #4。 |
-| 8 | `apps/desktop/tests/welcome-startup.spec.ts` | 两处 `dsh://open` 断言改为 `raindsh://open` | 跟随改动 #7。 |
-| 9 | `apps/desktop/scripts/electron-builder-config.mjs` + `resources/icon-windows.ico` | `win.icon` 改用预生成的多尺寸 ICO，并提交该文件 | electron-builder 的 PNG→ICO 转换会调起 WASM 图标工具，需要 WASM SIMD；不支持 SIMD 的机器（含部分虚拟机）会在打包最后一步失败。 |
-| 10 | `apps/desktop/scripts/smoke-packaged-runtime.ts` | 用 `PRODUCT_NAME` 常量替代硬编码的 `DeepSeek Harness.exe` / `.app` | 打包后的冒烟测试按固定文件名启动应用；产品名改了之后它找不到 exe。 |
-| 11 | `apps/desktop/scripts/smoke-runtime.ts` | 两处 profile 名改为 `rain-desktop` | 跟随改动 #1，否则冒烟测试会在错误的 profile 上安装插件。 |
+| 1 | `apps/desktop/scripts/electron-builder-config.mjs` | `extraMetadata.name` 设为 `'@rainroom/dsh-desktop'` | Electron 从打包后的 manifest 取 `app.name`，据此决定 userData 目录与单实例锁名。这是两个客户端能同时运行的唯一机制。 |
+| 2 | 同上 | `productName` **保持上游 `'DeepSeek Harness'`** | 运行时资产硬编码了产品名，例如 `resources/runtime/cli/bin/dsh.cmd` 启动 `<app>/DeepSeek Harness.exe`；改名会让内置 CLI 与依赖它的功能失效。共存由 `extraMetadata.name` 负责，不需要改产品名。 |
+| 3 | 同上 | `protocols` 改为 `{ name: 'Rain Harness', schemes: ['raindsh'] }` | 两个客户端不再抢同一个 `dsh://` 协议处理器。 |
+| 4 | 同上 | unsigned 构建不再解析强制更新策略 | 上游只对 macOS unsigned 免除，Windows 仍强制要求 HTTPS 策略来源。本 fork 不参与自动更新，该要求只会挡住本地打包。 |
+| 5 | `apps/desktop/scripts/desktop-package-environment.mjs` | 同上：`validateDesktopPackageEnvironment` 只在非 unsigned 时解析策略 | 跟随改动 #4，否则校验阶段仍会要求策略来源。 |
+| 6 | `apps/desktop/src/main.ts` | `setAsDefaultProtocolClient('raindsh')`、`raindsh://open` | 跟随改动 #3。 |
+| 7 | `apps/desktop/tests/welcome-startup.spec.ts` | 两处 `dsh://open` 断言改为 `raindsh://open` | 跟随改动 #6。 |
+| 8 | `apps/desktop/scripts/electron-builder-config.mjs` + `resources/icon-windows.ico` | `win.icon` 改用预生成的多尺寸 ICO，并提交该文件 | electron-builder 的 PNG→ICO 转换会调起 WASM 图标工具，需要 WASM SIMD；不支持 SIMD 的机器（含部分虚拟机）会在打包最后一步失败。 |
+| 9 | `apps/desktop/scripts/smoke-packaged-runtime.ts` | 用 `PRODUCT_NAME` 常量替代硬编码的 `DeepSeek Harness.exe` / `.app` | 打包后的冒烟测试按固定文件名启动应用；产品名改了之后它找不到 exe。 |
 
 ### 刻意未改动
 
 - **`DSH_HOME_DIR_NAME` 保持 `.dsh`。** 早期版本曾改为 `.raindsh` 以彻底隔离数据，但那会让按
-  默认目录取数的插件失效，已还原。隔离改由 profile 名与 Electron userData 承担。
+  默认目录取数的插件失效，已还原。隔离只由 Electron userData 承担。
+- **Desktop profile 保持 `profiles/desktop`。** 曾改为 `rain-desktop` 以避开官方版的 profile 锁，
+  但那既没解决 `ds-harness-remote` 的加载问题，又多出配置迁移成本。`apps/desktop/src/paths.ts`
+  与 `scripts/smoke-runtime.ts` 因此与上游零 diff，升级时不会在这两处产生冲突。
 - **产物文件名保持 `deepseek-harness-` 前缀。** 打包流程用它定位产物：
   `desktop-build-version-discovery.ts` 的正则、`package-target.ts`、`package-macos.ts`、
   `desktop-upload-plan.ts`、`retain-desktop-ci.ts` 都硬编码了该前缀，改名会让流程找不到输出。
@@ -49,7 +50,7 @@
 | 项 | 官方版 | 本 fork |
 |---|---|---|
 | Harness 数据根（会话/凭据/storages） | `~/.dsh` | `~/.dsh`（**共享**） |
-| Desktop profile（插件集合、运行锁） | `~/.dsh/profiles/desktop` | `~/.dsh/profiles/rain-desktop`（独立） |
+| Desktop profile（插件集合、运行锁） | `~/.dsh/profiles/desktop` | `~/.dsh/profiles/desktop`（**共享**） |
 | Electron userData | `%APPDATA%\@deepseek-ai\dsh-desktop` | `%APPDATA%\@rainroom\dsh-desktop`（独立） |
 | 单实例锁 | 按 userData | 独立，可与官方版同时运行 |
 | 程序显示名 | DeepSeek Harness | DeepSeek Harness（未改名） |
@@ -61,23 +62,20 @@
 
 - 两个客户端可以同时打开，互不退出。
 - **不要在两个客户端里同时操作同一个会话。** 会话目录共享，双开会造成冲突写入。
-- 插件各自安装：官方版的插件在 `profiles/desktop`，本 fork 的在 `profiles/rain-desktop`，互不影响，
-  但磁盘占用是两份。
-- **界面里安装插件不需要指定 profile。** 插件管理器的 pnpm 工作目录就是本应用自己的 profile 目录，即
-  `~/.dsh/profiles/rain-desktop`，等价于 `dsh plugin --profile rain-desktop add …`；那条命令只是等价写法。
+- 插件集合共享：界面里安装的插件写进 `~/.dsh/profiles/desktop`，两个客户端都会加载；停用或删除
+  同理，会同时影响官方版。磁盘上只有一份。
 - 升级本 fork 只替换程序目录，`~/.dsh` 与 `%APPDATA%\@rainroom\dsh-desktop` 都不会被删除。
-- **切换 profile 后旧配置不会自动迁移。** 模型、供应商、界面开关都写在
-  `~/.dsh/profiles/<profile>/cordis.patch.yml` 里；换 profile 名后需要把旧的那个文件复制到新
-  profile 目录，否则会看起来像"配置丢了"。插件目录 `node_modules` 同理，需要重新安装。
+- 早前构建留下过 `~/.dsh/profiles/rain-desktop`，已不再使用；其中的模型配置如需保留，先复制到
+  `~/.dsh/profiles/desktop/cordis.patch.yml`，再删除该目录。
 
-### 本机 profile 私有配置（换机或换 profile 时重做）
+### 本机 profile 私有配置（换机时重做）
 
 下面两个文件属于机器配置，不在仓库里；profile 重建后需要重新放置，否则会表现成"配置丢了 / 私服插件装不上"。
 
 | 文件 | 内容 |
 |---|---|
-| `~/.dsh/profiles/rain-desktop/cordis.patch.yml` | 模型、供应商（如 `provider: sin`、`baseURL`）、界面开关 |
-| `~/.dsh/profiles/rain-desktop/.npmrc` | 私服作用域映射，例如 `@sinexcel:registry=…/sinexcel-deepseek-harness-local-npm/` |
+| `~/.dsh/profiles/desktop/cordis.patch.yml` | 模型、供应商（如 `provider: sin`、`baseURL`）、界面开关 |
+| `~/.dsh/profiles/desktop/.npmrc` | 私服作用域映射，例如 `@sinexcel:registry=…/sinexcel-deepseek-harness-local-npm/` |
 
 私服认证 token 写在 `%USERPROFILE%\.npmrc`，按相同的 host 与路径作键；profile 的 `.npmrc` 只放作用域映射，不放 token。
 
@@ -143,10 +141,9 @@ powershell -NoProfile -ExecutionPolicy Bypass -File fork\install-green.ps1
 ## 升级后验证
 
 1. 双击桌面 `Rain Harness`，帮助菜单的"关于"里版本号是新的。
-2. `~/.dsh/profiles/rain-desktop` 存在，`profiles/desktop` 未被创建或修改。
+2. 应用使用 `~/.dsh/profiles/desktop`，与官方版是同一个 profile。
 3. 官方客户端仍能同时打开，两者互不退出。
-4. 本 fork 装过的插件在 `~/.dsh/profiles/rain-desktop`，官方版插件列表不受影响。
-5. 快捷方式目标仍是 `D:\E\AI_DEV_PROJECT\dsh-use-app\DeepSeek Harness.exe`。
+4. 快捷方式目标仍是 `D:\E\AI_DEV_PROJECT\dsh-use-app\DeepSeek Harness.exe`。
 
 ## 故障处理
 
@@ -155,15 +152,15 @@ powershell -NoProfile -ExecutionPolicy Bypass -File fork\install-green.ps1
 | 打包末尾报 `client build environment differs` | 构建期间动过 git。保持工作树干净后重跑。 |
 | 报 `desktop package: cannot read ... .env.windows` | 删掉损坏的文件，重跑脚本会自动重建。 |
 | 桌面快捷方式打不开 | 部署目录被移动或删除。重跑 `install-green.ps1 -SkipBuild`。 |
-| 两个客户端互相踢下线 | 检查是否 `extraMetadata.name` 丢失（改动 #2），它决定单实例锁。 |
+| 两个客户端互相踢下线 | 检查是否 `extraMetadata.name` 丢失（改动 #1），它决定单实例锁。 |
 | 想回滚到上一版 | 升级前把 `dsh-use-app` 复制一份；回滚时关闭应用、把副本还原回该路径。 |
 
 ## 同步上游后必须复查
 
-1. `apps/desktop/src/paths.ts` 的 profile 仍是 `rain-desktop`；`smoke-runtime.ts` 同步。
+1. `apps/desktop/src/paths.ts` 与 `scripts/smoke-runtime.ts` 仍与上游一致（不换 profile 名）。
 2. `electron-builder-config.mjs` 的 `extraMetadata.name`、`productName`、`protocols`
    与 `main.ts` 的协议字符串仍然一致。
-3. unsigned 的两处策略例外（改动 #5/#6）仍在，否则打包会重新要求 HTTPS 策略来源。
+3. unsigned 的两处策略例外（改动 #4/#5）仍在，否则打包会重新要求 HTTPS 策略来源。
 4. 产品名两处需同步：`electron-builder-config.mjs` 的 `productName` 与 `smoke-packaged-runtime.ts` 的
    `PRODUCT_NAME`，**都必须是 `'DeepSeek Harness'`**——运行时资产里硬编码了这个名字。
 5. `DSH_HOME_DIR_NAME` 仍是 `.dsh`（本 fork 不修改它）。
@@ -173,11 +170,10 @@ powershell -NoProfile -ExecutionPolicy Bypass -File fork\install-green.ps1
 - **会话与凭据共享。** 这是换取插件兼容性的代价：两个客户端看到同一份会话列表。
 - **同一会话不可双开。** 两端同时操作会造成冲突写入。
 - **没有自动更新。** 应用不带更新源，升级只能靠重新打包。
-- **`ds-harness-remote` 需要先登录账号，不是接口不兼容。** 未登录时插件宿主连不上
-  `https://dsh.r2049.cn`，服务端返回 `401 ACCOUNT_AUTH_REQUIRED`，界面显示为"控制通道仍在启动"。
-  在 Remote 设置里登录（或从已登录的 Remote 客户端授权本机）后即可使用。插件日志在
-  `~/.dsh/logs/ds-harness-remote/host.log`，身份与凭据在 `~/.dsh/ds-harness-remote/servers/<hash>/`，
-  该目录位于 Harness home 下，两个客户端共用同一份登录状态。
+- **`ds-harness-remote` 在本 fork 内未能加载，根因未定。** 已排除插件版本与文件差异、账号授权、
+  profile 组成、`@sinexcel` 插件冲突、产品名硬编码；残留症状是 `/ds-harness-remote/status` 返回 404、
+  `~/.dsh/logs/ds-harness-remote/host.log` 不更新。官方安装包 `D:\E\develop\ai\dsh`（同为
+  `0.2.2-rc.3`）在同一个 profile 下能正常出二维码。需要该插件时先用官方版。
 - **文档与快照仍写着 `~/.dsh` 的旧描述**，与现状一致，无需同步。
 
 ## 已验证
@@ -187,10 +183,12 @@ powershell -NoProfile -ExecutionPolicy Bypass -File fork\install-green.ps1
 - `tsx scripts/package-target.ts win-x64 --unsigned --dir` 完整跑通，退出码 0，含冒烟测试。
 - 绿色版部署到 `D:\E\AI_DEV_PROJECT\dsh-use-app`，桌面快捷方式指向该目录。
 - 早前版本（`.raindsh` + `profiles/desktop`）已验证过：数据写入自有 home、官方 `~/.dsh` 未被触碰。
-  当前版本改为共享 `~/.dsh` 并换用 `rain-desktop` profile，两者的并行运行待本轮构建后复验。
+- 绿色版与官方 `D:\E\develop\ai\dsh` 同时运行正常：`@rainroom/dsh-desktop` 与
+  `@deepseek-ai/dsh-desktop` 的 userData 与单实例锁互不干扰。
 
 ## 待办
 
-- [ ] 本轮构建后验证：`profiles/rain-desktop` 被创建、官方 `profiles/desktop` 不受影响、
-      两个客户端可同时运行、插件安装在 `rain-desktop` 下。
+- [ ] 本轮构建后确认 `ds-harness-remote` 在共享 `profiles/desktop` 下能否出二维码；若仍不能，
+      结论是该插件只在官方发行的安装包里工作，本 fork 不再追这条线。
+- [ ] 确认 `~/.dsh/profiles/rain-desktop` 已无用途后删除；磁盘上另有 `~/.raindsh` 属更早实验残留。
 - [ ] 如需数据完全隔离又要插件可用，只能逐插件适配其取数逻辑，无法在本 fork 内统一解决。
